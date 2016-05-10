@@ -11,10 +11,10 @@ expolit-2a, expolia-2b are easier, just pass url longer than the buffer, will pa
 
 
 ```bash
-//open on console to launch the webserve
+//open one console to launch the webserve
 ./clean-env.sh ./zookld zook-exstack.conf
 
-//another lunch to use gdb
+//another console to use gdb
 gdb -p $(pgrep zookfs-exstack)
 b process_client
 continue
@@ -23,9 +23,10 @@ continue
 ./expolit-3y localhost 8080
 
 //see the gdb agian, it break now
-p reqpath
 //here p is still some init value
-p &reqpath  //get reqpath address
+p reqpath
+//get reqpath address
+p &reqpath  
 //see current stack frame here
 info frame
 //the saved eip address is our return address,
