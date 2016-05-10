@@ -1,8 +1,9 @@
-README
+## README
 
-1. expolit-2a, expolia-2b are easier, just pass url longer than the buffer, will pass the test.
+### expolit-2a, expolia-2b
+expolit-2a, expolia-2b are easier, just pass url longer than the buffer, will pass the test.
 
-2. expolit-3.py
+###  expolit-3
 
 * I exploit the reqpath in process_client.
 * I install VMWARE in my mac, then install ssh server in linux, use my mac terminal to ssh connect the linux, then write code and debug. It is much easier to code in this way.
@@ -42,14 +43,13 @@ info frame
 //we can use x/s to check the value in some address 
 x/s 0xbfffee08 
 
-
-
 ```
+
 * this is very helpful.
 https://crypto.stanford.edu/cs155old/cs155-spring07/pp1-demonstration.txt  
 
 
-3. expoit-4a.py
+### expoit-4a.py
 still use reqpath to do return libc 
 * https://www.exploit-db.com/docs/28553.pdf is very helpful.
 
@@ -81,4 +81,4 @@ use similar way to do,to launch gdb
 gdb -p $(pgrep zookfs)
 ```
 
-4. I put the docs helps me a lot in more_info dir.
+* I put the docs helps me a lot in more_info dir.
