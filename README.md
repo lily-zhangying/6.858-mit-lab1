@@ -7,7 +7,7 @@ expolit-2a, expolia-2b are easier, just pass url longer than the buffer, will pa
 
 * I exploit the reqpath in process_client.
 * I install VMWARE in my mac, then install ssh server in linux, use my mac terminal to ssh connect the linux, then write code and debug. It is much easier to code in this way.
-* When I try to get the return address, the instructions seems not correct, in gdb, the return address in 2048+20 bytes bigger than the  reqpath address, not 2048, it took me very long time to find this. below is my bash to debug.
+* When I try to get the return address, the instructions seems not correct, in gdb, the return address in 2048+20 bytes bigger than the  reqpath address, not 2048. below is my bash to debug.
 
 
 ```bash
