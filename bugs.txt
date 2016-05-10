@@ -1,0 +1,30 @@
+#
+# [file:#lines]
+# desc
+#
+
+[zookd.c:68]
+We can overflow the 'reqpath' variable into 'fd' and the instruction
+pointer.
+
+    url_decode(reqpath, sp1);
+exploit-4a, expliot-3 use this bug
+
+[http.c:159]
+We can overflow the 'value' variable into 'i', followed by 'fd' and
+the instruction pointer. 
+
+    url_decode(value, sp);
+exploit-4b use this bug.
+
+[http.c:165]
+We can overflow the 'envvar' variable into 'value'. 
+    sprintf(envvar, "HTTP_%s", buf);
+
+[http.c:94]
+We can overflow the 'envp' variable.
+    envp += sprintf(envp, "REQUEST_URI=%s", reqpath) + 1;
+
+[http.c:255]
+We can overflow the 'pn' variable.
+    strcat(pn, name);

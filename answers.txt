@@ -1,0 +1,29 @@
+Exercise 2:
+
+exploit-2a.py, exploit-2b.py 
+
+exploits bug#2 (http.c:159) by passing in a header field
+with a very long value
+
+exploit-2b.py 
+
+exploit  bug#5 (http.c:255) by passing in a request path
+that's longer than 1024.
+
+
+Exercise 3:
+
+exploit bug#1. README shows how to do this.
+
+Exercise 4:
+expolit Bugs#1 and #2 
+
+Exercise 5:
+
+1  If you submit an HTTP request without a newline character, the read()
+call in http_read_line will block, and zookd will not accept any new incoming
+connections. This basically results in denial-of-service; the website becomes unusable. . 
+
+
+ 2. There is no auth when transfering zoobars between users, so an attacker may
+call the transfer service to change the other users' information or others.
